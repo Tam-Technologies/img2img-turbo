@@ -47,7 +47,9 @@ def main(args):
 
     if args.pretrained_model_name_or_path == "stabilityai/sd-turbo":
         net_pix2pix = Pix2Pix_Turbo(lora_rank_unet=args.lora_rank_unet, lora_rank_vae=args.lora_rank_vae)
-        net_pix2pix.set_train()
+    else:
+        net_pix2pix = Pix2Pix_Turbo(pretrained_path=args.pretrained_model_name_or_path, lora_rank_unet=args.lora_rank_unet, lora_rank_vae=args.lora_rank_vae)
+    net_pix2pix.set_train()
 
     if args.enable_xformers_memory_efficient_attention:
         if is_xformers_available():
@@ -292,7 +294,11 @@ def main(args):
                             curr_stats = get_folder_features(os.path.join(args.output_dir, "eval", f"fid_{global_step}"), model=feat_model, num_workers=0, num=None,
                                     shuffle=False, seed=0, batch_size=8, device=torch.device("cuda"),
                                     mode="clean", custom_image_tranform=fn_transform, description="", verbose=True)
-                            fid_score = fid_from_feats(ref_stats, curr_stats)
+                            try:
+                                fid_score = fid_from_feats(ref_stats, curr_stats)
+                            except Exception as e:
+                                print(f"Error computing FID, setting to 1000: {e}")
+                                fid_score = 1000
                             logs["val/clean_fid"] = fid_score
                         logs["val/l2"] = np.mean(l_l2)
                         logs["val/lpips"] = np.mean(l_lpips)

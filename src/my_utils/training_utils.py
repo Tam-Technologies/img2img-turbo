@@ -210,6 +210,11 @@ def build_transform(image_prep):
         T = transforms.Compose([
             transforms.Resize((512, 512), interpolation=Image.LANCZOS)
         ])
+    elif image_prep == "grayscale_to_binary":
+        T = transforms.Compose([
+            transforms.Grayscale(),
+            transforms.Lambda(lambda x: x.point(lambda pixel: 0 if pixel < 170 else 255))
+        ])
     elif image_prep == "no_resize":
         T = transforms.Lambda(lambda x: x)
     return T
@@ -283,8 +288,8 @@ class PairedDataset(torch.utils.data.Dataset):
         should be compatible with the models intended to be used with this dataset.
         """
         img_name = self.img_names[idx]
-        input_img = Image.open(os.path.join(self.input_folder, img_name))
-        output_img = Image.open(os.path.join(self.output_folder, img_name))
+        input_img = Image.open(os.path.join(self.input_folder, img_name)).convert('RGB')
+        output_img = Image.open(os.path.join(self.output_folder, img_name)).convert('RGB')
         caption = self.captions[img_name]
 
         # input images scaled to 0,1
