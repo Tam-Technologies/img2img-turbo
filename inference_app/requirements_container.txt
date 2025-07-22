@@ -1,0 +1,14 @@
+diffusers
+fastapi
+numpy
+opencv-python
+peft
+pillow
+pydantic
+scipy==1.11.1
+tokenizers==0.21.2
+torch
+torchvision
+transformers
+tqdm
+uvicorn

@@ -8,26 +8,27 @@ from src import constants
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
+IMAGE_CHOICES = ['train', 'inference']
 
-def build():
+def build(args):
     print(f"Building Docker image")
-    dockerfile_path = os.path.join(SCRIPT_DIR, "app", "Dockerfile")
+    dockerfile_path = os.path.join(SCRIPT_DIR, f"{args.image}_app", "Dockerfile")
 
-    docker_build_cmd = ["docker", "build", "--build-arg", "WANDB_API_KEY=" + os.environ['WANDB_API_KEY'], "--tag", constants.IMAGE_NAME, "-f", dockerfile_path]
+    docker_build_cmd = ["docker", "build", "--build-arg", "WANDB_API_KEY=" + os.environ['WANDB_API_KEY'], "--tag", f"{constants.IMAGE_NAME}-{args.image}", "-f", dockerfile_path]
     docker_build_cmd.append(SCRIPT_DIR)
     print(' '.join(docker_build_cmd))
     subprocess.check_call(docker_build_cmd)
 
-def push():
-    build()
+def push(args):
+    build(args)
 
-    print(f"Pushing Docker image {constants.IMAGE_NAME} to Google Container Registry")
-    registry_image = f"gcr.io/{constants.PROJECT_ID}/{constants.IMAGE_NAME}"
-    subprocess.check_call(["docker", "image", "tag", constants.IMAGE_NAME, registry_image])
+    print(f"Pushing Docker image {constants.IMAGE_NAME}-{args.image} to Google Container Registry")
+    registry_image = f"gcr.io/{constants.PROJECT_ID}/{constants.IMAGE_NAME}-{args.image}"
+    subprocess.check_call(["docker", "image", "tag", f"{constants.IMAGE_NAME}-{args.image}", registry_image])
     subprocess.check_call(["docker", "push", registry_image])
 
-def run():
-    build()
+def run(args):
+    build(args)
 
     PORT=8080
     image_key_path="/tmp/keys/google_key.json"
@@ -37,7 +38,7 @@ def run():
                            "-e", "K_CONFIGURATION=dev", "-e", "K_REVISION=dev-00001",
                            "-e", f"GOOGLE_APPLICATION_CREDENTIALS={image_key_path}",
                            "-v", f"{local_key_path}:{image_key_path}:ro",
-                           constants.IMAGE_NAME]
+                           f"{constants.IMAGE_NAME}-{args.image}"]
     if args.shell:
         docker_run_cmd.append("-it")
         docker_run_opt.append("sh")
@@ -47,6 +48,7 @@ def run():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Image utilities')
+    parser.add_argument('-i', '--image', required=True, choices=IMAGE_CHOICES, help='Name of the image')
     subparsers = parser.add_subparsers(help='Choose what you would like to do with this image. Default is build')
     parser.set_defaults(func=run)
     parser.set_defaults(shell=False)
@@ -62,4 +64,4 @@ if __name__ == '__main__':
     parser_run.add_argument("-sh", "--shell", action="store_true", help="Run the image locally in an interactive shell")
 
     args = parser.parse_args()
-    args.func()
+    args.func(args)
