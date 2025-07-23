@@ -14,7 +14,9 @@ def build(args):
     print(f"Building Docker image")
     dockerfile_path = os.path.join(SCRIPT_DIR, f"{args.image}_app", "Dockerfile")
 
-    docker_build_cmd = ["docker", "build", "--build-arg", "WANDB_API_KEY=" + os.environ['WANDB_API_KEY'], "--tag", f"{constants.IMAGE_NAME}-{args.image}", "-f", dockerfile_path]
+    docker_build_cmd = ["docker", "build",  "--tag", f"{constants.IMAGE_NAME}-{args.image}", "-f", dockerfile_path]
+    if args.image == 'train':
+        docker_build_cmd.extend(["--build-arg", "WANDB_API_KEY=" + os.environ['WANDB_API_KEY']])
     docker_build_cmd.append(SCRIPT_DIR)
     print(' '.join(docker_build_cmd))
     subprocess.check_call(docker_build_cmd)
@@ -26,6 +28,29 @@ def push(args):
     registry_image = f"gcr.io/{constants.PROJECT_ID}/{constants.IMAGE_NAME}-{args.image}"
     subprocess.check_call(["docker", "image", "tag", f"{constants.IMAGE_NAME}-{args.image}", registry_image])
     subprocess.check_call(["docker", "push", registry_image])
+
+def deploy(args):
+    push(args)
+
+    if args.image == "train":
+        print(f"{args.image} is not a Google Cloud Run service, and should deployed to Vertex AI instead. Exiting.")
+        return
+
+    registry_image = f"gcr.io/{constants.PROJECT_ID}/{constants.IMAGE_NAME}-{args.image}"
+    print(f"Deploying Docker service {constants.IMAGE_NAME}-{args.image} to Google Run")
+    memory = "16Gi"
+    concurrency = "10"
+    cpu = "4"
+    gpu = "1"
+    gpu_type = "nvidia-l4"
+    max_instances = "3"
+    deploy_cmd = ["gcloud", "run", "deploy", f"{constants.IMAGE_NAME}-{args.image}", "--image", registry_image,
+                  "--project", constants.PROJECT_ID, "--region", "us-central1", "--memory", memory,
+                  "--concurrency", concurrency, "--cpu", cpu, "--gpu", gpu, "--gpu-type", gpu_type,
+                  "--max-instances", max_instances, "--timeout", "30m"]
+
+    print(' '.join(deploy_cmd))
+    subprocess.check_call(deploy_cmd)
 
 def run(args):
     build(args)
@@ -58,6 +83,9 @@ if __name__ == '__main__':
 
     parser_build = subparsers.add_parser('push', help='Push the image to Google Container Registry')
     parser_build.set_defaults(func=push)
+
+    parser_deploy = subparsers.add_parser('deploy', help='Deploy the image to Google Cloud Run')
+    parser_deploy.set_defaults(func=deploy)
 
     parser_run = subparsers.add_parser('run', help='Run the image locally')
     parser_run.set_defaults(func=run)

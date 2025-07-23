@@ -63,7 +63,7 @@ async def predict(payload: SingleImagePayload):
             output_buffer = io.BytesIO()
             output_pil.save(output_buffer, format="PNG")
             output_image_base64 = base64.b64encode(output_buffer.getvalue()).decode("utf-8")
-        logging.info(f"Image segmentation processing is complete.")
+        logging.info(f"Image processing is complete.")
 
         end_time = time.time()
         execution_time = end_time - start_time
@@ -72,7 +72,7 @@ async def predict(payload: SingleImagePayload):
         return {
             "message": "Image processed successfully",
             "execution_time": execution_time,
-            "ouput_image": output_image_base64
+            "output_image": output_image_base64
         }
 
     except Exception as e:
