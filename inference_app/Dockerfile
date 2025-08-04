@@ -9,11 +9,11 @@ ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION python
 
 # Copy application dependency manifests to the container image.
 # Copying this separately prevents re-running pip install on every code change.
-COPY ./inference_app/requirements_container.txt ./
+COPY ./requirements.txt ./
 
 # Install production dependencies.
 RUN pip install --upgrade pip
-RUN pip install -r requirements_container.txt
+RUN pip install -r requirements.txt
 RUN apt-get update
 RUN apt-get install -y libgomp1
 RUN apt-get install -y libusb-1.0-0
