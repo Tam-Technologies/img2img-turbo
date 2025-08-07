@@ -54,6 +54,7 @@ async def predict_path(payload: SingleImagePathPayload):
 
         if payload.output_image_path:
             logging.info(f"Saving output image to {payload.output_image_path}")
+            os.makedirs(os.path.dirname(payload.output_image_path), exist_ok=True)
             output_pil = base64_to_image(result['output_image'])
             output_pil.save(payload.output_image_path)
         return result
