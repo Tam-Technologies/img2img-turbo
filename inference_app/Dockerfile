@@ -1,5 +1,6 @@
 # Dockerfile-gpu
-FROM nvcr.io/nvidia/pytorch:23.12-py3
+FROM cyclegan-turbo:latest
+#FROM nvcr.io/nvidia/pytorch:23.12-py3
 
 # Allow statements and log messages to immediately appear in the Cloud Run logs
 ENV PYTHONUNBUFFERED True

@@ -36,6 +36,10 @@ def deploy(args):
         print(f"{args.image} is not a Google Cloud Run service, and should deployed to Vertex AI instead. Exiting.")
         return
 
+    # In order to set up a Google Cloud Storage bucket as a volume that is mounted to the Docker container, follow the
+    # instructions here:
+    # https://cloud.google.com/run/docs/configuring/services/cloud-storage-volume-mounts#console
+    # This only needs to be done once. Once mounted, the container can read/write directly to the bucket.
     registry_image = f"gcr.io/{constants.PROJECT_ID}/{constants.IMAGE_NAME}-{args.image}"
     print(f"Deploying Docker service {constants.IMAGE_NAME}-{args.image} to Google Run")
     memory = "16Gi"
