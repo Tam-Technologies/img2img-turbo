@@ -30,5 +30,5 @@ if __name__ == "__main__":
                       json={"input_image_path": f'/gcs/synthetic_scans/001MroKY4Rkdzg0eTXvN/body/silhouettes/silhouette0.png',
                             "prompt": "A woman in a sports bra and shorts standing in an indoor gym with arms raised, facing towards the camera",
                             "use_fp16": True,
-                            "output_image_path": f'/gcs/synthetic_scans/001MroKY4Rkdzg0eTXvN/body/cyclegan_turbo_images_v{constants.CYCLEGAN_TURBO_VERSION}/silhouette0.png'})
+                            "output_image_path": f'/gcs/synthetic_scans/001MroKY4Rkdzg0eTXvN/body/cyclegan_turbo_images_v{constants.CYCLEGAN_TURBO_VERSION}/snapshot0.png'})
     print(r.json()['execution_time'])

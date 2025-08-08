@@ -19,6 +19,7 @@ logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
 
+
 class SingleImagePayload(BaseModel):
     input_image: str
     prompt: str
@@ -34,13 +35,15 @@ class SingleImagePathPayload(BaseModel):
 
 @app.post("/predict-image-path")
 async def predict_path(payload: SingleImagePathPayload):
-    logging.info(f"Received request to run inference on a single image at path {payload.input_image_path}.")
-    if not os.path.exists(payload.input_image_path):
-        raise HTTPException(status_code=404, detail=f"Image not found at {payload.input_image_path}")
-    if payload.output_image_path and os.path.exists(payload.output_image_path):
-        raise HTTPException(status_code=400, detail=f"Output image already exists at {payload.output_image_path}")
-
     try:
+        logging.info(f"Received request to run inference on a single image at path {payload.input_image_path}.")
+        if not os.path.exists(payload.input_image_path):
+            raise HTTPException(status_code=299, detail=f"Image not found at {payload.input_image_path}")
+        if payload.output_image_path and os.path.exists(payload.output_image_path):
+            raise HTTPException(status_code=299,
+                              detail=f"Output image already exists at {payload.output_image_path}")
+
+
         img = Image.open(payload.input_image_path)
         base64_string = image_to_base64(img)
 
@@ -59,6 +62,10 @@ async def predict_path(payload: SingleImagePathPayload):
             output_pil.save(payload.output_image_path)
         return result
 
+    except HTTPException as e:
+        logging.error(f"Error processing request: {e.detail}", exc_info=True)
+        raise e
+
     except Exception as e:
         logging.error(f"Error processing request: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -66,17 +73,17 @@ async def predict_path(payload: SingleImagePathPayload):
 
 @app.post("/predict")
 async def predict(payload: SingleImagePayload):
-    logging.info("Received request to run inference on a single image.")
-    start_time = time.time()
-
-    # Strip off the base64 image header if it exists
-    base64_image = payload.input_image
-    if base64_image.startswith("data:image"):
-        base64_image = base64_image.split(",")[1]
-    if not base64_image:
-        raise HTTPException(status_code=400, detail="Invalid image format")
-
     try:
+        logging.info("Received request to run inference on a single image.")
+        start_time = time.time()
+
+        # Strip off the base64 image header if it exists
+        base64_image = payload.input_image
+        if base64_image.startswith("data:image"):
+            base64_image = base64_image.split(",")[1]
+        if not base64_image:
+            raise HTTPException(status_code=299, detail="Invalid image format")
+
         if torch.cuda.is_available():
             print("Using CUDA")
         else:
@@ -118,6 +125,10 @@ async def predict(payload: SingleImagePayload):
             "execution_time": execution_time,
             "output_image": output_image_base64
         }
+
+    except HTTPException as e:
+        logging.error(f"Error processing request: {e.detail}", exc_info=True)
+        raise e
 
     except Exception as e:
         logging.error(f"Error processing request: {e}", exc_info=True)
