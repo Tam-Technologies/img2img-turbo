@@ -13,6 +13,7 @@ from torchvision import transforms
 
 from src.pix2pix_turbo import Pix2Pix_Turbo
 from src.my_utils.base64_image_conversion import image_to_base64, base64_to_image
+from src import firebase_utils
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +33,7 @@ class SingleImagePathPayload(BaseModel):
     pretrained_model_name: str = 'pix2pix_turbo_segment32bit_binary_silhouette_to_scan_image'
     use_fp16: bool = False
     output_image_path: str = None
+    output_segment32bit_path: str = None
 
 @app.post("/predict-image-path")
 async def predict_path(payload: SingleImagePathPayload):
@@ -60,6 +62,11 @@ async def predict_path(payload: SingleImagePathPayload):
             os.makedirs(os.path.dirname(payload.output_image_path), exist_ok=True)
             output_pil = base64_to_image(result['output_image'])
             output_pil.save(payload.output_image_path)
+
+        if payload.output_segment32bit_path:
+            firebase_utils.create_segment_image_task(result['output_image'], use_32bit=True, preprocess=True,
+                                                     output_image_path=payload.output_segment32bit_path)
+
         return result
 
     except HTTPException as e:
@@ -114,7 +121,7 @@ async def predict(payload: SingleImagePayload):
             output_pil = transforms.ToPILImage()(output_image[0].cpu() * 0.5 + 0.5)
 
             output_image_base64 = image_to_base64(output_pil)
-        logging.info(f"Image processing is complete.")
+        logging.info(f"Image generation is complete.")
 
         end_time = time.time()
         execution_time = end_time - start_time

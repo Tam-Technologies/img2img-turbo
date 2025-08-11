@@ -8,6 +8,7 @@ import constants
 
 PREDICT_URL = 'https://cyclegan-turbo-inference-437403722141.us-central1.run.app/predict'
 PREDICT_PATH_URL = 'https://cyclegan-turbo-inference-437403722141.us-central1.run.app/predict-image-path'
+# PREDICT_PATH_URL = 'http://localhost:8080/predict-image-path'
 
 if __name__ == "__main__":
     df = pd.read_csv('/Users/mtam/Documents/scans/synthetic_scans_dataset_csv/mixed_distribution_38k_no_ttf_shapes_no_cyclegan/train_dataset_female.csv')
@@ -30,5 +31,6 @@ if __name__ == "__main__":
                       json={"input_image_path": f'/gcs/synthetic_scans/001MroKY4Rkdzg0eTXvN/body/silhouettes/silhouette0.png',
                             "prompt": "A woman in a sports bra and shorts standing in an indoor gym with arms raised, facing towards the camera",
                             "use_fp16": True,
-                            "output_image_path": f'/gcs/synthetic_scans/001MroKY4Rkdzg0eTXvN/body/cyclegan_turbo_images_v{constants.CYCLEGAN_TURBO_VERSION}/snapshot0.png'})
+                            "output_image_path": f'/gcs/synthetic_scans/001MroKY4Rkdzg0eTXvN/body/cyclegan_turbo_images_v{constants.CYCLEGAN_TURBO_VERSION}/snapshot0.png',
+                            "output_segment32bit_path": f'vertex-ai-data-us-central1/synthetic_scans/001MroKY4Rkdzg0eTXvN/body/cyclegan_turbo_segment32bit_silhouettes_v{constants.CYCLEGAN_TURBO_VERSION}/silhouette0.png'})
     print(r.json()['execution_time'])

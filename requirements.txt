@@ -26,3 +26,5 @@ diffusers
 gradio
 wandb
 vision_aided_loss
+firebase-admin
+google-cloud-tasks
