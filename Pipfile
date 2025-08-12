@@ -17,6 +17,7 @@ tqdm = "*"
 safetensors = "*"
 numpy = "==1.26.4"
 opencv-python = "*"
+pandas = "*"
 
 [dev-packages]
 

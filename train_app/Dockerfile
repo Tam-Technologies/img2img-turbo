@@ -1,5 +1,6 @@
 # Dockerfile-gpu
-FROM nvcr.io/nvidia/pytorch:23.12-py3
+FROM cyclegan-turbo:latest
+# FROM nvcr.io/nvidia/pytorch:23.12-py3
 
 # Allow statements and log messages to immediately appear in the Cloud Run logs
 ENV PYTHONUNBUFFERED True
@@ -20,9 +21,9 @@ RUN apt-get install -y libusb-1.0-0
 RUN apt-get install -y libgl1-mesa-glx
 
 # Copy local code to the container image.
-ENV APP_HOME /app
+ENV APP_HOME /train_app
 WORKDIR $APP_HOME
-COPY ./app ./
+COPY ./train_app ./
 COPY ./src ./src
 
 ARG WANDB_API_KEY

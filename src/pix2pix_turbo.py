@@ -120,6 +120,25 @@ class Pix2Pix_Turbo(torch.nn.Module):
                 _sd_unet[k] = sd["state_dict_unet"][k]
             unet.load_state_dict(_sd_unet)
 
+        elif pretrained_name == "pix2pix_turbo_segment32bit_binary_silhouette_to_scan_image":
+            sd = torch.load(os.path.join(ckpt_folder, f"{pretrained_name}.pkl"), map_location="cpu")
+            unet_lora_config = LoraConfig(r=sd["rank_unet"], init_lora_weights="gaussian", target_modules=sd["unet_lora_target_modules"])
+            vae_lora_config = LoraConfig(r=sd["rank_vae"], init_lora_weights="gaussian", target_modules=sd["vae_lora_target_modules"])
+            vae.add_adapter(vae_lora_config, adapter_name="vae_skip")
+            _sd_vae = vae.state_dict()
+            for k in sd["state_dict_vae"]:
+                _sd_vae[k] = sd["state_dict_vae"][k]
+            vae.load_state_dict(_sd_vae)
+            unet.add_adapter(unet_lora_config)
+            _sd_unet = unet.state_dict()
+            for k in sd["state_dict_unet"]:
+                _sd_unet[k] = sd["state_dict_unet"][k]
+            unet.load_state_dict(_sd_unet)
+            self.lora_rank_unet = sd["rank_unet"]
+            self.lora_rank_vae = sd["rank_vae"]
+            self.target_modules_vae = sd["vae_lora_target_modules"]
+            self.target_modules_unet = sd["unet_lora_target_modules"]
+
         elif pretrained_path is not None:
             sd = torch.load(pretrained_path, map_location="cpu")
             unet_lora_config = LoraConfig(r=sd["rank_unet"], init_lora_weights="gaussian", target_modules=sd["unet_lora_target_modules"])
