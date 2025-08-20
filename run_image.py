@@ -43,13 +43,15 @@ def deploy(args):
     registry_image = f"gcr.io/{constants.PROJECT_ID}/{constants.IMAGE_NAME}-{args.image}"
     print(f"Deploying Docker service {constants.IMAGE_NAME}-{args.image} to Google Run")
     memory = "16Gi"
+    concurrency = "200"
     cpu = "4"
     gpu = "1"
     gpu_type = "nvidia-l4"
     max_instances = "3"
     deploy_cmd = ["gcloud", "run", "deploy", f"{constants.IMAGE_NAME}-{args.image}", "--image", registry_image,
                   "--project", constants.PROJECT_ID, "--region", "us-central1", "--memory", memory, "--cpu", cpu,
-                  "--gpu", gpu, "--gpu-type", gpu_type, "--max-instances", max_instances, "--timeout", "30m"]
+                  "--gpu", gpu, "--gpu-type", gpu_type, "--max-instances", max_instances, "--timeout", "30m",
+                  "--concurrency", concurrency, "--set-env-vars", "HF_HOME=/gcs/huggingface_cache"]
 
     print(' '.join(deploy_cmd))
     subprocess.check_call(deploy_cmd)
