@@ -43,7 +43,7 @@ def deploy(args):
     registry_image = f"gcr.io/{constants.PROJECT_ID}/{constants.IMAGE_NAME}-{args.image}"
     print(f"Deploying Docker service {constants.IMAGE_NAME}-{args.image} to Google Run")
     memory = "16Gi"
-    concurrency = "200"
+    concurrency = "50"
     cpu = "4"
     gpu = "1"
     gpu_type = "nvidia-l4"
