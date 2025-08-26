@@ -9,3 +9,6 @@ PROD_SCANS_BUCKET_NAME = 'truetoform-6685b.appspot.com'
 VERTEX_AI_SERVICE_ACCOUNT_EMAIL = f'vertex-ai-service-account@{PROJECT_ID}.iam.gserviceaccount.com'
 
 CYCLEGAN_TURBO_VERSION = '1'
+
+# Model loading settings
+LOCAL_FILES_ONLY = True

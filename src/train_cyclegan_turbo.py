@@ -18,6 +18,7 @@ from cleanfid.fid import get_folder_features, build_feature_extractor, frechet_d
 import vision_aided_loss
 from model import make_1step_sched
 from cyclegan_turbo import CycleGAN_Turbo, VAE_encode, VAE_decode, initialize_unet, initialize_vae
+from constants import LOCAL_FILES_ONLY
 from my_utils.training_utils import UnpairedDataset, build_transform, parse_args_unpaired_training
 from my_utils.dino_struct import DinoStructureLoss
 
@@ -29,9 +30,9 @@ def main(args):
     if accelerator.is_main_process:
         os.makedirs(os.path.join(args.output_dir, "checkpoints"), exist_ok=True)
 
-    tokenizer = AutoTokenizer.from_pretrained("stabilityai/sd-turbo", subfolder="tokenizer", revision=args.revision, use_fast=False, local_files_only=True)
+    tokenizer = AutoTokenizer.from_pretrained("stabilityai/sd-turbo", subfolder="tokenizer", revision=args.revision, use_fast=False, local_files_only=LOCAL_FILES_ONLY)
     noise_scheduler_1step = make_1step_sched()
-    text_encoder = CLIPTextModel.from_pretrained("stabilityai/sd-turbo", subfolder="text_encoder", local_files_only=True).cuda()
+    text_encoder = CLIPTextModel.from_pretrained("stabilityai/sd-turbo", subfolder="text_encoder", local_files_only=LOCAL_FILES_ONLY).cuda()
 
     unet, l_modules_unet_encoder, l_modules_unet_decoder, l_modules_unet_others = initialize_unet(args.lora_rank_unet, return_lora_module_names=True)
     vae_a2b, vae_lora_target_modules = initialize_vae(args.lora_rank_vae, return_lora_module_names=True)

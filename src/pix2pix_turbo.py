@@ -11,6 +11,7 @@ from peft import LoraConfig
 p = "src/"
 sys.path.append(p)
 from model import make_1step_sched, my_vae_encoder_fwd, my_vae_decoder_fwd
+from constants import LOCAL_FILES_ONLY
 
 
 class TwinConv(torch.nn.Module):
@@ -29,13 +30,13 @@ class TwinConv(torch.nn.Module):
 class Pix2Pix_Turbo(torch.nn.Module):
     def __init__(self, pretrained_name=None, pretrained_path=None, ckpt_folder="checkpoints", lora_rank_unet=8, lora_rank_vae=4):
         super().__init__()
-        self.tokenizer = AutoTokenizer.from_pretrained("stabilityai/sd-turbo", subfolder="tokenizer", local_files_only=True)
-        self.text_encoder = CLIPTextModel.from_pretrained("stabilityai/sd-turbo", subfolder="text_encoder", local_files_only=True)
+        self.tokenizer = AutoTokenizer.from_pretrained("stabilityai/sd-turbo", subfolder="tokenizer", local_files_only=LOCAL_FILES_ONLY)
+        self.text_encoder = CLIPTextModel.from_pretrained("stabilityai/sd-turbo", subfolder="text_encoder", local_files_only=LOCAL_FILES_ONLY)
         if torch.cuda.is_available():
             self.text_encoder = self.text_encoder.cuda()
         self.sched = make_1step_sched()
 
-        vae = AutoencoderKL.from_pretrained("stabilityai/sd-turbo", subfolder="vae", local_files_only=True)
+        vae = AutoencoderKL.from_pretrained("stabilityai/sd-turbo", subfolder="vae", local_files_only=LOCAL_FILES_ONLY)
         vae.encoder.forward = my_vae_encoder_fwd.__get__(vae.encoder, vae.encoder.__class__)
         vae.decoder.forward = my_vae_decoder_fwd.__get__(vae.decoder, vae.decoder.__class__)
         # add the skip connection convs
@@ -49,7 +50,7 @@ class Pix2Pix_Turbo(torch.nn.Module):
             vae.decoder.skip_conv_3 = vae.decoder.skip_conv_3.cuda()
             vae.decoder.skip_conv_4 = vae.decoder.skip_conv_4.cuda()
         vae.decoder.ignore_skip = False
-        unet = UNet2DConditionModel.from_pretrained("stabilityai/sd-turbo", subfolder="unet", local_files_only=True)
+        unet = UNet2DConditionModel.from_pretrained("stabilityai/sd-turbo", subfolder="unet", local_files_only=LOCAL_FILES_ONLY)
 
         if pretrained_name == "edge_to_image":
             url = "https://www.cs.cmu.edu/~img2img-turbo/models/edge_to_image_loras.pkl"
