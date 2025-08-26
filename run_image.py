@@ -15,7 +15,7 @@ def build(args):
     print(f"Building Docker image")
     dockerfile_path = os.path.join(SCRIPT_DIR, f"{args.image}_app", "Dockerfile")
 
-    docker_build_cmd = ["docker", "build",  "--tag", f"{constants.IMAGE_NAME}-{args.image}", "-f", dockerfile_path]
+    docker_build_cmd = ["docker", "build",  "--tag", f"{constants.IMAGE_NAME}-{args.image}", "-f", dockerfile_path, "--platform", "linux/amd64"]
     if args.image == 'train':
         docker_build_cmd.extend(["--build-arg", "WANDB_API_KEY=" + os.environ['WANDB_API_KEY']])
     docker_build_cmd.append(SCRIPT_DIR)
