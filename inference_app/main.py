@@ -67,18 +67,46 @@ def download_from_gcs(gcs_path: str) -> bytes:
         if not blob.exists():
             raise HTTPException(status_code=404, detail=f"File not found in GCS: {gcs_path}")
         
-        logging.info(f"Downloading file from GCS: {gcs_path}")
         return blob.download_as_bytes()
     except Exception as e:
-        logging.error(f"Error downloading from GCS {gcs_path}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to download from GCS: {str(e)}")
+
+def file_exists_with_fallback(file_path: str) -> bool:
+    """Check if file exists locally or in GCS"""
+    # First, check local filesystem
+    if os.path.exists(file_path):
+        return True
+    
+    # If path is GCS, check GCS
+    if is_gcs_path(file_path):
+        if gcs_client is None:
+            initialize_gcs_client()
+        
+        bucket_name, blob_name = parse_gcs_path(file_path)
+        if bucket_name and blob_name:
+            try:
+                bucket = gcs_client.bucket(bucket_name)
+                blob = bucket.blob(blob_name)
+                return blob.exists()
+            except Exception:
+                return False
+    
+    # Try GCS with default bucket as fallback
+    gcs_path = f"gs://{constants.VERTEX_AI_BUCKET_NAME}/{file_path.lstrip('/')}"
+    try:
+        if gcs_client is None:
+            initialize_gcs_client()
+        bucket = gcs_client.bucket(constants.VERTEX_AI_BUCKET_NAME)
+        blob = bucket.blob(file_path.lstrip('/'))
+        return blob.exists()
+    except Exception:
+        return False
 
 def load_image_with_fallback(image_path: str) -> Image.Image:
     """Load image from local filesystem or GCS with fallback logic"""
     # First, try to load from local filesystem
     if os.path.exists(image_path):
-        logging.info(f"Loading image from local filesystem: {image_path}")
-        return Image.open(image_path)
+        return Image.open(image_path).convert('RGB')
     
     # If not found locally and path is GCS, try GCS
     if is_gcs_path(image_path):
@@ -86,16 +114,15 @@ def load_image_with_fallback(image_path: str) -> Image.Image:
             initialize_gcs_client()
         
         image_bytes = download_from_gcs(image_path)
-        return Image.open(io.BytesIO(image_bytes))
+        return Image.open(io.BytesIO(image_bytes)).convert('RGB')
     
     # Try GCS with default bucket as fallback
     gcs_path = f"gs://{constants.VERTEX_AI_BUCKET_NAME}/{image_path.lstrip('/')}"
-    logging.info(f"Trying GCS fallback path: {gcs_path}")
     try:
         if gcs_client is None:
             initialize_gcs_client()
         image_bytes = download_from_gcs(gcs_path)
-        return Image.open(io.BytesIO(image_bytes))
+        return Image.open(io.BytesIO(image_bytes)).convert('RGB')
     except HTTPException:
         pass  # Continue to raise the original error
     
@@ -234,8 +261,8 @@ async def process_image_path(input_image_path: str, prompt: str, pretrained_mode
         logging.info(f"Received request to run inference on image at path {input_image_path}")
         
         # Check if output path already exists, skip processing if it does
-        if output_image_path and os.path.exists(output_image_path):
-            return {"message": f"Output image already exists at {payload.output_image_path}, skipping inference"}
+        if output_image_path and file_exists_with_fallback(output_image_path):
+            return {"message": f"Output image already exists at {output_image_path}, skipping inference"}
         
         # Load and convert image to base64
         img = load_image_with_fallback(input_image_path)
@@ -250,6 +277,7 @@ async def process_image_path(input_image_path: str, prompt: str, pretrained_mode
         )
         
         # Process the image using legacy predict function
+        logging.info(f"Processing image {input_image_path} with prompt {prompt}")
         result = await predict(single_image_payload)
         
         # Save output image if path specified
@@ -348,13 +376,13 @@ async def process_single_image(input_image: str, prompt: str, pretrained_model_n
 async def predict_path(payload: SingleImagePathPayload):
     try:
         logging.info(f"Received request to run inference on a single image at path {payload.input_image_path}.")
-        if not os.path.exists(payload.input_image_path):
-            raise HTTPException(status_code=299, detail=f"Image not found at {payload.input_image_path}")
-        if payload.output_image_path and os.path.exists(payload.output_image_path):
+        if payload.output_image_path and file_exists_with_fallback(payload.output_image_path):
             return {"message": f"Output image already exists at {payload.output_image_path}, skipping inference"}
 
-        img = Image.open(payload.input_image_path)
+        img = load_image_with_fallback(payload.input_image_path)
         base64_string = image_to_base64(img)
+
+        logging.info(f"Image loaded successfully from {payload.input_image_path}")
 
         single_image_payload = SingleImagePayload(
             input_image=base64_string,

@@ -4,8 +4,10 @@ from io import BytesIO
 
 def image_to_base64(image):
     # Convert PIL Image to base64 encoding
+    image = image.convert('RGB')
+
     with BytesIO() as buffer:
-        image.save(buffer, 'png')
+        image.save(buffer, 'PNG')
         return base64.b64encode(buffer.getvalue()).decode()
 
 def base64_to_image(base64_string):
