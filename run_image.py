@@ -66,8 +66,28 @@ def deploy_vertexai(args):
     print(f"Region: {constants.LOCATION}")
     print(f"Model name: {model_name}")
     
+    # Check if model with same display name already exists
+    print("Checking if model already exists...")
+    check_cmd = [
+        "gcloud", "ai", "models", "list",
+        "--region", constants.LOCATION,
+        "--project", constants.PROJECT_ID,
+        "--filter", f"displayName='{model_name}'",
+        "--format", "value(name)"
+    ]
+    
+    try:
+        result = subprocess.run(check_cmd, capture_output=True, text=True, check=True)
+        existing_model_id = result.stdout.strip()
+        # Convert model ID to full resource path
+        if existing_model_id:
+            existing_model = f"projects/{constants.PROJECT_ID}/locations/{constants.LOCATION}/models/{existing_model_id}"
+        else:
+            existing_model = ""
+    except subprocess.CalledProcessError:
+        existing_model = ""
+    
     # Upload model to Vertex AI
-    print("Creating Vertex AI model...")
     upload_cmd = [
         "gcloud", "ai", "models", "upload",
         "--region", constants.LOCATION,
@@ -76,34 +96,20 @@ def deploy_vertexai(args):
         "--container-ports", "8080",
         "--container-predict-route", "/predict",
         "--container-health-route", "/health",
-        "--project", constants.PROJECT_ID
+        "--project", constants.PROJECT_ID,
+        "--container-env-vars", "HF_HOME=/gcs/huggingface_cache"
     ]
     
-    print(' '.join(upload_cmd))
-    result = subprocess.run(upload_cmd, capture_output=True, text=True)
-    
-    if result.returncode == 0:
-        print("Model uploaded successfully!")
-        print("\nNext steps:")
-        print("1. Create an endpoint:")
-        print(f"   gcloud ai endpoints create --region={constants.LOCATION} --display-name={constants.IMAGE_NAME}-{args.image}-endpoint --project={constants.PROJECT_ID}")
-        print("")
-        print("2. Deploy the model to the endpoint:")
-        print(f"   gcloud ai endpoints deploy-model ENDPOINT_ID --region={constants.LOCATION} --model=MODEL_ID --display-name=deployment --machine-type=n1-standard-4 --project={constants.PROJECT_ID}")
-        print("")
-        print("Replace ENDPOINT_ID and MODEL_ID with the actual IDs from the previous commands.")
-        
-        # Try to extract model ID from output
-        if "Created model" in result.stdout:
-            lines = result.stdout.split('\n')
-            for line in lines:
-                if "Created model" in line and "projects/" in line:
-                    model_id = line.split('/')[-1].strip()
-                    print(f"\nModel ID: {model_id}")
-                    break
+    if existing_model:
+        print(f"Model '{model_name}' already exists. Uploading as new version...")
+        upload_cmd.extend(["--parent-model", existing_model])
     else:
-        print(f"Error uploading model: {result.stderr}")
-        subprocess.check_call(upload_cmd)  # Re-run to show full error
+        print(f"Creating new model '{model_name}'...")
+    
+    print(' '.join(upload_cmd))
+    subprocess.check_call(upload_cmd)
+    
+    print("Model uploaded successfully!")
 
 def deploy(args):
     """Deploy based on target platform"""
@@ -149,8 +155,8 @@ if __name__ == '__main__':
 
     parser_deploy = subparsers.add_parser('deploy', help='Deploy the image to Google Cloud Run or Vertex AI')
     parser_deploy.set_defaults(func=deploy)
-    parser_deploy.add_argument('-t', '--target', choices=DEPLOY_CHOICES, default='cloudrun', 
-                              help='Deployment target: cloudrun (default) or vertexai')
+    parser_deploy.add_argument('-t', '--target', choices=DEPLOY_CHOICES, default='vertexai', 
+                              help='Deployment target: cloudrun or vertexai (default)')
 
     parser_run = subparsers.add_parser('run', help='Run the image locally')
     parser_run.set_defaults(func=run)
