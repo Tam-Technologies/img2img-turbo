@@ -97,7 +97,8 @@ def deploy_vertexai(args):
         "--container-predict-route", "/predict",
         "--container-health-route", "/health",
         "--project", constants.PROJECT_ID,
-        "--container-env-vars", "HF_HOME=/gcs/huggingface_cache"
+        "--container-env-vars", "HF_HOME=/gcs/huggingface_cache",
+        "--version-aliases", "default"
     ]
     
     if existing_model:

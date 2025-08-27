@@ -71,6 +71,46 @@ def download_from_gcs(gcs_path: str) -> bytes:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to download from GCS: {str(e)}")
 
+def upload_to_gcs(gcs_path: str, image: Image.Image) -> None:
+    """Upload PIL Image to GCS"""
+    bucket_name, blob_name = parse_gcs_path(gcs_path)
+    if not bucket_name or not blob_name:
+        raise HTTPException(status_code=400, detail=f"Invalid GCS path: {gcs_path}")
+    
+    try:
+        # Convert PIL Image to bytes
+        img_byte_arr = io.BytesIO()
+        # Determine format from file extension or default to PNG
+        format = 'PNG'
+        if blob_name.lower().endswith('.jpg') or blob_name.lower().endswith('.jpeg'):
+            format = 'JPEG'
+        elif blob_name.lower().endswith('.webp'):
+            format = 'WEBP'
+        
+        image.save(img_byte_arr, format=format)
+        img_byte_arr.seek(0)
+        
+        # Upload to GCS
+        bucket = gcs_client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+        blob.upload_from_file(img_byte_arr, content_type=f'image/{format.lower()}')
+        
+        logging.info(f"Successfully uploaded image to GCS: {gcs_path}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload to GCS: {str(e)}")
+
+def save_image_with_gcs_support(image: Image.Image, output_path: str) -> None:
+    """Save image to local filesystem or GCS based on path"""
+    if is_gcs_path(output_path):
+        # Initialize GCS client if needed
+        if gcs_client is None:
+            initialize_gcs_client()
+        upload_to_gcs(output_path, image)
+    else:
+        # Save to local filesystem
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        image.save(output_path)
+
 def file_exists_with_fallback(file_path: str) -> bool:
     """Check if file exists locally or in GCS"""
     # First, check local filesystem
@@ -283,9 +323,8 @@ async def process_image_path(input_image_path: str, prompt: str, pretrained_mode
         # Save output image if path specified
         if output_image_path:
             logging.info(f"Saving output image to {output_image_path}")
-            os.makedirs(os.path.dirname(output_image_path), exist_ok=True)
             output_pil = base64_to_image(result['output_image'])
-            output_pil.save(output_image_path)
+            save_image_with_gcs_support(output_pil, output_image_path)
         
         # Create segmentation task if path specified
         if output_segment32bit_path:
@@ -394,9 +433,8 @@ async def predict_path(payload: SingleImagePathPayload):
 
         if payload.output_image_path:
             logging.info(f"Saving output image to {payload.output_image_path}")
-            os.makedirs(os.path.dirname(payload.output_image_path), exist_ok=True)
             output_pil = base64_to_image(result['output_image'])
-            output_pil.save(payload.output_image_path)
+            save_image_with_gcs_support(output_pil, payload.output_image_path)
 
         if payload.output_segment32bit_path:
             firebase_utils.create_segment_image_task(result['output_image'], use_32bit=True, preprocess=True,
