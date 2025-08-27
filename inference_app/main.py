@@ -3,6 +3,7 @@ import time
 import base64
 import io
 import os
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
@@ -11,10 +12,12 @@ from typing import List, Dict, Any, Optional
 from PIL import Image
 import torch
 from torchvision import transforms
+from google.cloud import storage
 
 from src.pix2pix_turbo import Pix2Pix_Turbo
 from src.my_utils.base64_image_conversion import image_to_base64, base64_to_image
 from src import firebase_utils
+from src import constants
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +27,81 @@ app = FastAPI()
 # Global model instance - load once at startup
 model = None
 
+# GCS client - initialize once
+gcs_client = None
+
+def initialize_gcs_client():
+    """Initialize GCS client"""
+    global gcs_client
+    if gcs_client is None:
+        gcs_client = storage.Client()
+        logging.info("GCS client initialized successfully")
+
+def is_gcs_path(path: str) -> bool:
+    """Check if path is a GCS path"""
+    return path.startswith('gs://') or path.startswith('/gcs')
+
+def parse_gcs_path(path: str) -> tuple:
+    """Parse GCS path into bucket and blob name"""
+    if path.startswith('gs://'):
+        parsed = urlparse(path)
+        bucket_name = parsed.netloc
+        blob_name = parsed.path.lstrip('/')
+        return bucket_name, blob_name
+    elif path.startswith('/gcs'):
+        # Remove /gcs prefix and use default bucket
+        blob_name = path[4:].lstrip('/')
+        return constants.VERTEX_AI_BUCKET_NAME, blob_name
+    return None, None
+
+def download_from_gcs(gcs_path: str) -> bytes:
+    """Download file from GCS and return bytes"""
+    bucket_name, blob_name = parse_gcs_path(gcs_path)
+    if not bucket_name or not blob_name:
+        raise HTTPException(status_code=400, detail=f"Invalid GCS path: {gcs_path}")
+    
+    try:
+        bucket = gcs_client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+        
+        if not blob.exists():
+            raise HTTPException(status_code=404, detail=f"File not found in GCS: {gcs_path}")
+        
+        logging.info(f"Downloading file from GCS: {gcs_path}")
+        return blob.download_as_bytes()
+    except Exception as e:
+        logging.error(f"Error downloading from GCS {gcs_path}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to download from GCS: {str(e)}")
+
+def load_image_with_fallback(image_path: str) -> Image.Image:
+    """Load image from local filesystem or GCS with fallback logic"""
+    # First, try to load from local filesystem
+    if os.path.exists(image_path):
+        logging.info(f"Loading image from local filesystem: {image_path}")
+        return Image.open(image_path)
+    
+    # If not found locally and path is GCS, try GCS
+    if is_gcs_path(image_path):
+        if gcs_client is None:
+            initialize_gcs_client()
+        
+        image_bytes = download_from_gcs(image_path)
+        return Image.open(io.BytesIO(image_bytes))
+    
+    # Try GCS with default bucket as fallback
+    gcs_path = f"gs://{constants.VERTEX_AI_BUCKET_NAME}/{image_path.lstrip('/')}"
+    logging.info(f"Trying GCS fallback path: {gcs_path}")
+    try:
+        if gcs_client is None:
+            initialize_gcs_client()
+        image_bytes = download_from_gcs(gcs_path)
+        return Image.open(io.BytesIO(image_bytes))
+    except HTTPException:
+        pass  # Continue to raise the original error
+    
+    # If all else fails, raise file not found error
+    raise HTTPException(status_code=299, detail=f"Image not found at {image_path}")
+
 # Get environment variables set by Vertex AI
 AIP_HTTP_PORT = int(os.getenv('AIP_HTTP_PORT', '8080'))
 AIP_HEALTH_ROUTE = os.getenv('AIP_HEALTH_ROUTE', '/health')
@@ -32,7 +110,6 @@ AIP_PREDICT_ROUTE = os.getenv('AIP_PREDICT_ROUTE', '/predict')
 logging.info(f"Server will run on port: {AIP_HTTP_PORT}")
 logging.info(f"Health route: {AIP_HEALTH_ROUTE}")
 logging.info(f"Predict route: {AIP_PREDICT_ROUTE}")
-
 
 # Vertex AI request/response models
 class VertexAIRequest(BaseModel):
@@ -71,6 +148,9 @@ async def startup_event():
         logging.error(f"Failed to load model on startup: {e}")
         # Don't fail startup, allow model loading on first request
         model = None
+    
+    # Initialize GCS client
+    initialize_gcs_client()
 
 # Vertex AI health check endpoint
 @app.get(AIP_HEALTH_ROUTE)
@@ -153,16 +233,12 @@ async def process_image_path(input_image_path: str, prompt: str, pretrained_mode
     try:
         logging.info(f"Received request to run inference on image at path {input_image_path}")
         
-        # Validate input file exists
-        if not os.path.exists(input_image_path):
-            raise HTTPException(status_code=299, detail=f"Image not found at {input_image_path}")
-        
-        # Validate output file doesn't exist
+        # Check if output path already exists, skip processing if it does
         if output_image_path and os.path.exists(output_image_path):
-            raise HTTPException(status_code=299, detail=f"Output image already exists at {output_image_path}")
+            return {"message": f"Output image already exists at {payload.output_image_path}, skipping inference"}
         
         # Load and convert image to base64
-        img = Image.open(input_image_path)
+        img = load_image_with_fallback(input_image_path)
         base64_string = image_to_base64(img)
         
         # Create payload for processing
@@ -275,9 +351,7 @@ async def predict_path(payload: SingleImagePathPayload):
         if not os.path.exists(payload.input_image_path):
             raise HTTPException(status_code=299, detail=f"Image not found at {payload.input_image_path}")
         if payload.output_image_path and os.path.exists(payload.output_image_path):
-            raise HTTPException(status_code=299,
-                              detail=f"Output image already exists at {payload.output_image_path}")
-
+            return {"message": f"Output image already exists at {payload.output_image_path}, skipping inference"}
 
         img = Image.open(payload.input_image_path)
         base64_string = image_to_base64(img)

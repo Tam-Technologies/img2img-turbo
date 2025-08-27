@@ -1,5 +1,6 @@
 diffusers
 fastapi
+google-cloud-storage
 numpy
 opencv-python
 peft

@@ -11,4 +11,4 @@ VERTEX_AI_SERVICE_ACCOUNT_EMAIL = f'vertex-ai-service-account@{PROJECT_ID}.iam.g
 CYCLEGAN_TURBO_VERSION = '1'
 
 # Model loading settings
-LOCAL_FILES_ONLY = True
+LOCAL_FILES_ONLY = False

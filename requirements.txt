@@ -27,4 +27,5 @@ gradio
 wandb
 vision_aided_loss
 firebase-admin
+google-cloud-storage
 google-cloud-tasks
